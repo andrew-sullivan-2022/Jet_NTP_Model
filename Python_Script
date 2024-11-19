@@ -621,7 +621,8 @@ compact_source_velocity_samples = np.tile([cooling_velocity_kicks], (N_compact, 
 compact_energy_injection_samples = np.tile([cooling_rate], (N_compact, 1))
 
 # the cooling-only non-thermal pressure
-cooling_only_NTP_samples = np.tile([np.divide(1, np.add(1, (3*kB/(mu*mp))*np.divide(temperature_profile, np.square(cooling_velocity_kicks))))], (N_compact, 1))
+cooling_only_NTP = np.divide(1, np.add(1, (3*kB/(mu*mp))*np.divide(temperature_profile, np.square(cooling_velocity_kicks))))
+cooling_only_NTP_samples = np.tile([cooling_only_NTP], (N_compact, 1))
 
 
 
@@ -638,6 +639,7 @@ duty03_mean_effective_energy_injection = np.mean(np.concatenate((duty03_effectiv
 
 # converting velocities to km s^-1
 sound_speed_profile_kms = np.divide(sound_speed_profile, 10**3)
+cooling_velocity_kicks_kms = np.divide(cooling_velocity_kicks, 10**3)
 duty01_effective_velocity_kms = np.divide(duty01_effective_velocity_kick_samples, 10**3)
 duty02_effective_velocity_kms = np.divide(duty02_effective_velocity_kick_samples, 10**3)
 duty03_effective_velocity_kms = np.divide(duty03_effective_velocity_kick_samples, 10**3)
