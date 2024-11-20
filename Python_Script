@@ -395,9 +395,6 @@ age_samples_Myr = np.divide(age_samples, Myr)
 tesc_samples_Myr = np.divide(tesc_samples, Myr)
 ton_samples_Myr = np.divide(ton_samples, Myr)
 
-# histograms for jet on-times
-ton_bins = np.linspace(min(ton_samples_Myr), max(ton_samples_Myr), num=14)
-ton_hist, _ = np.histogram(ton_samples_Myr, bins=ton_bins)
 # updating histograms for jet powers and source ages, with stuck jets removed
 Qjet_hist, _ = np.histogram(Qjet_samples, bins=Qjet_bins)
 age_hist, _ = np.histogram(age_samples_Myr, bins=age_bins)
@@ -550,6 +547,10 @@ Rjet_hist, _ = np.histogram(Rjet_samples_kpc, bins=Rjet_bins)
 Req_hist, _ = np.histogram(Req_samples_kpc, bins=Rjet_bins)
 Rjet_no_flare_hist, _ = np.histogram(Rjet_samples_no_flare_kpc, bins=Rjet_bins)
 
+# histograms for outburst times and equilibrium times
+ton_bins = np.logspace(np.log10(min(ton_samples_Myr)), np.log10(max(ton_samples_Myr)), base=10, num=14)
+ton_hist, _ = np.histogram(ton_samples_Myr, bins=ton_bins)
+teq_hist, _ = np.histogram(teq_samples_Myr, bins=ton_bins)
 
 
 ## Calculating the velocity kicks from the jet heating model
