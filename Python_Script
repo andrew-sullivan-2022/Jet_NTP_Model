@@ -542,7 +542,7 @@ Rjet_samples_no_flare_kpc = np.divide(Rjet_samples_no_flare, kpc)
 print('the largest jet reaches: ' + str(max(Rjet_samples_kpc)) + ' kpc')
 
 # histograms for jet lengths and equilibrium jet lengths
-Rjet_bins = np.logspace(np.log10(min(Req_samples_kpc)), np.log10(max(Rjet_samples_kpc)), base=10, num=12)
+Rjet_bins = np.logspace(np.log10(min(Req_samples_kpc)), np.log10(max(Rjet_samples_kpc)), base=10, num=14)
 Rjet_hist, _ = np.histogram(Rjet_samples_kpc, bins=Rjet_bins)
 Req_hist, _ = np.histogram(Req_samples_kpc, bins=Rjet_bins)
 Rjet_no_flare_hist, _ = np.histogram(Rjet_samples_no_flare_kpc, bins=Rjet_bins)
