@@ -104,23 +104,12 @@ Tvir = (1/3)*(mu*mp/kB)*G*Mvir/rvir # K
 pvir = (kB*Tvir/(mu*mp))*f_b*Delta*rho_crit(h) # Pa = kg m^-1 s^-2
 # virial circular velocity
 vcvir = (G*Mvir/rvir)**0.5 # m s^-1
+
 print('the virial mass is: M500 = ' + str(Mvir/Msol) + ' Msol')
 print('the virial radius is: r500 = ' + str(rvir/kpc) + ' kpc')
 print('the virial temperature is: T500 = ' + str(Tvir) + ' K')
 print('the virial pressure is: p500 = ' + str(pvir) + ' Pa')
 
-
-
-## Stellar parameters
-
-# stellar mass
-Mstar = ((Mvir/Msol)*10**18.93)**(1/3.02)*Msol # kg
-# stellar radius, 50%-light
-Rstar_50 = 10**(0.126*(np.log10(Mstar/Msol) - 11) + 0.543)*kpc # m
-# stellar radius, 90%-light
-Rstar_90 = 10**(0.143*(np.log10(Mstar/Msol) - 11) + 0.955)*kpc # m
-# choice in definition of stellar radius
-Rstar = Rstar_90
 # minimum resolution to consider
 rres = 10**(-4)*rvir # m
 
