@@ -71,6 +71,8 @@ Mpc = 3.086*10**22 # m
 
 # mean molecular weight
 mu = 0.6
+# mean electron weight
+mu_e = 1.148
 # adiabatic index
 gamma = 5/3
 
@@ -175,10 +177,6 @@ def temperature(s, c, a, d, e, eta): # K
 # pressure (hydrostatic equilibrium, boundary = zero @ infinity)
 def eq_pressure(s, c, a, d, e, eta): # kg m^-1 s^-2 = Pa
     return pvir*eta*U(c, a, d, e)*integral_func(s, c, a, d, e, eta)
-
-# pressure gradient (hydrostatic equilibrium, boundary = zero @ infinity)
-def eq_pressure_deriv(s, c, a, d, e, eta): # kg m^-2 s^-2 = Pa m^-1
-    return (pvir/rvir)*eta*U(c, a, d, e)*integral_func_deriv(s, c, a, d, e, eta)
 
 # sound speed (hydrostatic equilibrium, boundary = zero @ infinity)
 def sound_speed(s, c, a, d, e, eta): # m s^-1
