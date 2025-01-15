@@ -186,6 +186,10 @@ def sound_speed(s, c, a, d, e, eta): # m s^-1
 def number_density(s, c, a, d, e, eta): # m^-3
     return gas_density(s, c, a, d, e, eta)/(mu*mp)
 
+# derivative of pressure profile
+def eq_pressure_deriv(s, c, a, d, e, eta): # kg m^-2 s^-2 = Pa m^-1
+    return (pvir/rvir)*eta*U(c, a, d, e)*integral_func_deriv(s, c, a, d, e, eta)
+
 
 # loading the intracluster gas profiles, given a choice in environmental parameters
 gas_density_profile = np.empty(radius_bins)
@@ -381,6 +385,7 @@ age_samples = [i for j, i in enumerate(raw_age_samples) if j not in stuck_jet_in
 age_samples_Myr = np.divide(age_samples, Myr)
 tesc_samples_Myr = np.divide(tesc_samples, Myr)
 ton_samples_Myr = np.divide(ton_samples, Myr)
+log_ton_samples_Myr = [np.log10(i) for i in ton_samples_Myr]
 
 # updating histograms for jet powers and source ages, with stuck jets removed
 Qjet_hist, _ = np.histogram(Qjet_samples, bins=Qjet_bins)
@@ -642,19 +647,66 @@ duty03_mean_NTP = np.mean(np.concatenate((duty03_NTP_samples, cooling_only_NTP_s
 
 
 
-## SAVING THE DATA
+## Galaxy cluster energy integrals
 
-## duty cycle = 0.1
-# save the mean non-thermal pressure profile
-with open("mean_NTP_M14_5_c25_NFW_d1_e05_eta08_duty01_thetaJ85_thetaFRI15_sQ1_2_vw_calib.txt", "w") as output:
-    output.write(str(duty01_mean_NTP))
+# kinetic energy integrated over AGN volume
+def kinetic_energy(Rjet, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta, duty):
+    if Rjet <= R_eq(Q, thetaJ, s0, c, a, d, e, eta):
+        R = np.logspace(-3, np.log10(Rjet), base=10, num=150)
+        V_eq = 2*np.pi*(1 - np.cos(thetaJ))*R_eq(Q, thetaJ, s0, c, a, d, e, eta)**3/3
+        return (2*np.pi*(1 - np.cos(thetaJ))*(gamma-1)**2*(duty*Q)**2/V_eq**2)*int.quad(lambda R: R**2*gas_density(R/rvir, c, a, d, e, eta)/((eq_pressure_deriv(R/rvir, c, a, d, e, eta) + 2*gamma*eq_pressure(R/rvir, c, a, d, e, eta)/R)**2), 0, Rjet)[0]
+    if Rjet > R_eq(Q, thetaJ, s0, c, a, d, e, eta):
+        R = np.logspace(-3, np.log10(Rjet), base=10, num=150)
+        V_jet = 2*np.pi*(1 - np.cos(thetaJ))*R_eq(Q, thetaJ, s0, c, a, d, e, eta)**3/3 + 2*np.pi*int.quad(lambda R: R**2*filling_factor(R, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta), R_eq(Q, thetaJ, s0, c, a, d, e, eta), Rjet)[0]
+        return (2*np.pi*(gamma-1)**2*(duty*Q)**2/V_jet**2)*((1 - np.cos(thetaJ))*int.quad(lambda R: R**2*gas_density(R/rvir, c, a, d, e, eta)/((eq_pressure_deriv(R/rvir, c, a, d, e, eta) + 2*gamma*eq_pressure(R/rvir, c, a, d, e, eta)/R)**2), 0, R_eq(Q, thetaJ, s0, c, a, d, e, eta))[0] + int.quad(lambda R: filling_factor(R, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta)*R**2*gas_density(R/rvir, c, a, d, e, eta)/((eq_pressure_deriv(R/rvir, c, a, d, e, eta) + 2*gamma*eq_pressure(R/rvir, c, a, d, e, eta)/R)**2), R_eq(Q, thetaJ, s0, c, a, d, e, eta), Rjet)[0])
 
-## duty cycle = 0.2
-# save the mean non-thermal pressure profile
-with open("mean_NTP_M14_5_c25_NFW_d1_e05_eta08_duty02_thetaJ85_thetaFRI15_sQ1_2_vw_calib.txt", "w") as output:
-    output.write(str(duty02_mean_NTP))
+# thermal energy integrated over non-AGN volume
+def thermal_energy(Rjet, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta):
+    if Rjet <= R_eq(Q, thetaJ, s0, c, a, d, e, eta):
+        R = np.logspace(-3, np.log10(Rjet), base=10, num=150)
+        return (6*np.pi*(1- np.cos(thetaJ))/(mu*mp))*int.quad(lambda R: R**2*gas_density(R/rvir, c, a, d, e, eta)*kB*temperature(R/rvir, c, a, d, e, eta), 0, Rjet)[0]
+    if Rjet > R_eq(Q, thetaJ, s0, c, a, d, e, eta):
+        R = np.logspace(-3, np.log10(Rjet), base=10, num=150)
+        return (6*np.pi*(1- np.cos(thetaJ))/(mu*mp))*int.quad(lambda R: R**2*gas_density(R/rvir, c, a, d, e, eta)*kB*temperature(R/rvir, c, a, d, e, eta), R_eq(Q, thetaJ, s0, c, a, d, e, eta), Rjet)[0] + (6*np.pi/(mu*mp))*int.quad(lambda R: R**2*gas_density(R/rvir, c, a, d, e, eta)*kB*temperature(R/rvir, c, a, d, e, eta)*(filling_factor(R, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta)), R_eq(Q, thetaJ, s0, c, a, d, e, eta), Rjet)[0]
 
-## duty cycle = 0.3
-# save the mean non-thermal pressure profile
-with open("mean_NTP_M14_5_c25_NFW_d1_e05_eta08_duty03_thetaJ85_thetaFRI15_sQ1_2_vw_calib.txt", "w") as output:
-     output.write(str(duty03_mean_NTP))
+# thermal energy integrated over entire volume
+def thermal_energy_total(Rjet, Q):
+    R = np.logspace(-3, np.log10(Rjet), base=10, num=150)
+    return (6*np.pi/(mu*mp))*int.quad(lambda R: R**2*gas_density(R/rvir, c, a, d, e, eta)*kB*temperature(R/rvir, c, a, d, e, eta), 0, Rjet)[0]
+
+
+
+## Calculating the energy coupling of the model
+
+# calculating thermal and kinetic energy integrated over the cluster
+thermal_energy_samples = np.empty((N_outburst))
+duty01_kinetic_energy_samples = np.empty((N_outburst))
+duty02_kinetic_energy_samples = np.empty((N_outburst))
+duty03_kinetic_energy_samples = np.empty((N_outburst))
+duty04_kinetic_energy_samples = np.empty((N_outburst))
+duty05_kinetic_energy_samples = np.empty((N_outburst))
+duty1_kinetic_energy_samples = np.empty((N_outburst))
+for i in range(N_outburst):
+    thermal_energy_samples[i] = thermal_energy(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params)
+    duty01_kinetic_energy_samples[i] = kinetic_energy(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params, duty=0.1)
+    duty02_kinetic_energy_samples[i] = kinetic_energy(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params, duty=0.2)
+    duty03_kinetic_energy_samples[i] = kinetic_energy(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params, duty=0.3)
+    duty04_kinetic_energy_samples[i] = kinetic_energy(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params, duty=0.4)
+    duty05_kinetic_energy_samples[i] = kinetic_energy(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params, duty=0.5)
+    duty1_kinetic_energy_samples[i] = kinetic_energy(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params, duty=1)
+
+# calculating the kinetic energy coupling efficiency
+duty01_kinetic_coupling_samples = np.divide(duty01_kinetic_energy_samples, 2*np.multiply(Qjet_samples, ton_samples))
+duty02_kinetic_coupling_samples = np.divide(duty02_kinetic_energy_samples, 2*np.multiply(Qjet_samples, ton_samples))
+duty03_kinetic_coupling_samples = np.divide(duty03_kinetic_energy_samples, 2*np.multiply(Qjet_samples, ton_samples))
+duty04_kinetic_coupling_samples = np.divide(duty04_kinetic_energy_samples, 2*np.multiply(Qjet_samples, ton_samples))
+duty05_kinetic_coupling_samples = np.divide(duty05_kinetic_energy_samples, 2*np.multiply(Qjet_samples, ton_samples))
+duty1_kinetic_coupling_samples = np.divide(duty1_kinetic_energy_samples, 2*np.multiply(Qjet_samples, ton_samples))
+
+# calculating the mean kinetic energy coupling efficiency at each outburst radius
+Rjet_global = np.logspace(np.log10(min(Rjet_samples)), np.log10(max(Rjet_samples)), base=10, num=100)
+Rjet_bin_inds = np.digitize(Rjet_samples, Rjet_global)
+Rjet_bin_centres = 0.5*(Rjet_global[1:] + Rjet_global[:-1])
+mean_fit_duty01_kinetic_coupling_v_Rjet = [duty01_kinetic_coupling_samples[Rjet_bin_inds==i].mean() if np.count_nonzero(Rjet_bin_inds==i)>=10 else np.nan for i in range(1, 100)]
+mean_fit_duty02_kinetic_coupling_v_Rjet = [duty02_kinetic_coupling_samples[Rjet_bin_inds==i].mean() if np.count_nonzero(Rjet_bin_inds==i)>=10 else np.nan for i in range(1, 100)]
+mean_fit_duty03_kinetic_coupling_v_Rjet = [duty03_kinetic_coupling_samples[Rjet_bin_inds==i].mean() if np.count_nonzero(Rjet_bin_inds==i)>=10 else np.nan for i in range(1, 100)]
