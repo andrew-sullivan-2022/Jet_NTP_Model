@@ -157,7 +157,7 @@ def U(c, a, d, e):
 
 # integral function
 def integral_func(s, c, a, d, e, eta):
-    return int.quad(lambda s_: (1/(s_**(2+e)*(1 + C(c, a, d, e)*s_)**(3-e)))*((1 - eta*f_b)*u(c, a)*int.quad(lambda s__: s__**(2-a)/((1 + c*s__)**(3-a)), 0, s_)[0] + eta*f_b*U(c, a, d, e)*int.quad(lambda s__: s__**(2-e)/((1 + C(c, a, d, e)*s__)**(3-e)), 0, s_)[0]), s, np.infty)[0]
+    return int.quad(lambda s_: (1/(s_**(2+e)*(1 + C(c, a, d, e)*s_)**(3-e)))*((1 - eta*f_b)*u(c, a)*int.quad(lambda s__: s__**(2-a)/((1 + c*s__)**(3-a)), 0, s_)[0] + eta*f_b*U(c, a, d, e)*int.quad(lambda s__: s__**(2-e)/((1 + C(c, a, d, e)*s__)**(3-e)), 0, s_)[0]), s, np.inf)[0]
 
 # derivative of the integral function
 def integral_func_deriv(s, c, a, d, e, eta):
