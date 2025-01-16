@@ -200,29 +200,29 @@ sound_speed_profile = np.empty(radius_bins)
 th_pressure_profile = np.empty(radius_bins)
 number_density_profile = np.empty(radius_bins)
 for i in range(radius_bins):
-    gas_density_profile[i] = gas_density(s[i], *environ_params)
-    temperature_profile[i] = temperature(s[i], *environ_params)
-    sound_speed_profile[i] = sound_speed(s[i], *environ_params)
-    th_pressure_profile[i] = eq_pressure(s[i], *environ_params)
-    number_density_profile[i] = number_density(s[i], *environ_params)
-th_pressure_derivative = np.gradient(th_pressure_profile, np.multiply(rvir, s))
+    gas_density_profile[i] = gas_density(s[i], *environ_params) # kg m^-3
+    temperature_profile[i] = temperature(s[i], *environ_params) # K
+    sound_speed_profile[i] = sound_speed(s[i], *environ_params) # m s^-1
+    th_pressure_profile[i] = eq_pressure(s[i], *environ_params) # Pa
+    number_density_profile[i] = number_density(s[i], *environ_params) # m^-3
+th_pressure_derivative = np.gradient(th_pressure_profile, np.multiply(rvir, s)) # Pa m^-1
+electron_density_profile = np.divide(gas_density_profile, mu_e*mp) # m^-3
+hydrogen_density_profile = np.multiply((4/9), number_density_profile) # m^-3
+entropy_profile = kB*np.divide(temperature_profile, np.power(electron_density_profile, 2/3)) # J m^2
 
 
 
 ## Cooling function
 
 abundance_file='mzero.cie' # metallicity for Sutherland & Dopita (1993) cooling function, here correpsonding to solar abundances
-
-# interperlating from the gas temperature to the cooling function
+# interperlating the cooling function from the gas temperature
 logT_cool, logLambda_cool = read_ds_cooling(abundance_file) # T_cool in K, Lambda in funny units 13 dex higher than SI value
 logLambda_cool_interp = np.interp(np.log10(temperature_profile), logT_cool, logLambda_cool-13) # log ( W m^3 )
 Lambda_cool_interp = [10**i for i in logLambda_cool_interp] # W m^3
 
 # cooling time
 t_cool_profile = (3/2)*((mu_e+mu_i)/mu)*kB*np.divide(temperature_profile, np.multiply(Lambda_cool_interp, number_density_profile)) # s
-# hydrogen number density
-hydrogen_density_profile = np.multiply((4/9), number_density_profile) # m^-3
-# cooling function
+# cooling rate
 cooling_rate = np.multiply(np.multiply(hydrogen_density_profile, hydrogen_density_profile), Lambda_cool_interp) # W m^-3
 
 
