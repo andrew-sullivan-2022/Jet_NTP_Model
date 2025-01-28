@@ -96,7 +96,7 @@ Chi = 2*np.pi*(1 - np.cos(thetaFRI))
 
 
 
-## Galaxy cluster environmment
+## Galaxy cluster environment
 # to use the 'generalised cluster environment' profiles, see the functions in Sullivan et al. 2024b
 # below we use the Perseus cluster environment from Churazov et al. 2023
 
