@@ -1,7 +1,5 @@
-import builtins
 import numpy as np
-import scipy.integrate as int
-from scipy.interpolate import interp1d
+import scipy.integrate as integrate
 from pydl.pydlutils.cooling import read_ds_cooling
 
 
@@ -9,8 +7,7 @@ from pydl.pydlutils.cooling import read_ds_cooling
 ## BUILDING THE JET MODEL
 
 ## Number of radio samples
-N = 30000
-np.random.seed(15)
+N = 50000
 
 
 
@@ -18,8 +15,7 @@ np.random.seed(15)
 
 # scale-free radial scale
 radius_bins = 500
-s = np.logspace(-4, 1, base=10, num=radius_bins)
-s_ = np.logspace(-4, 1, base=10, num=radius_bins)
+s = np.logspace(-5, 1, base=10, num=radius_bins)
 
 
 
@@ -38,16 +34,14 @@ mp = 1.6726*10**(-27) # kg
 
 ## Cosmological constants
 
-# present-day critical density of the universe
-def rho_crit(h):
-    return 1.8788*10**(-26)*h**2 # kg m^-3
-
 # hubble parameter
 h = 0.6715
-
+# present-day critical density of the universe
+rho_crit = 1.8788*10**(-26)*h**2 # kg m^-3
 # density parameters
 Omega_b = 0.0486
 Omega_DM = 0.2589
+# fraction of baryon content
 f_b = Omega_b/(Omega_b + Omega_DM)
 
 
@@ -67,167 +61,132 @@ Mpc = 3.086*10**22 # m
 
 
 
-## Parameters of galaxy clusters
+## Gas parameters
 
 # mean molecular weight
 mu = 0.6
 # mean electron weight
 mu_e = 1.148
 # mean ion weight
-mu_i = 1.257
+mu_i = (1/mu + 1/mu_e)**(-1)
 # adiabatic index
 gamma = 5/3
 
-# concentration parameter
-c = 2.5
-# dark matter inner logarithmic slope
-a = 1
-# fraction of cosmological baryon content
-eta = 0.8
-# dilution parameter
-d = 1
-# intracluster gas inner logarithmic slope
-e = 0.5
-
-# environmental parameters, in list form
-environ_params = [c, a, d, e, eta]
 
 
+## AGN jet parameters
 
-## Virial parameters
-
-# overdensity criterion
-Delta = 500
-# virial mass
-Mvir = 10**14.5*Msol # kg
-# virial radius
-rvir = (3*Mvir/(4*np.pi*Delta*rho_crit(h)))**(1/3) # m
-# virial temperature
-Tvir = (1/3)*(mu*mp/kB)*G*Mvir/rvir # K
-# virial pressure
-pvir = (kB*Tvir/(mu*mp))*f_b*Delta*rho_crit(h) # Pa = kg m^-1 s^-2
-# virial circular velocity
-vcvir = (G*Mvir/rvir)**0.5 # m s^-1
-
-print('the virial mass is: M500 = ' + str(Mvir/Msol) + ' Msol')
-print('the virial radius is: r500 = ' + str(rvir/kpc) + ' kpc')
-print('the virial temperature is: T500 = ' + str(Tvir) + ' K')
-print('the virial pressure is: p500 = ' + str(pvir) + ' Pa')
-
-# minimum resolution to consider
-rres = 10**(-4)*rvir # m
-
-
-
-## Parameters of AGN jets
+# AGN duty cycle
+duty = 0.1
 
 # jet beam power constant
 k1 = 1
-# normalisation radius for jet evolution
-s0 = 0.01
-R0 = s0*rvir
+# normalisation radius for jet environment
+s0_index = np.argmin(np.abs(s.reshape(radius_bins, 1) - 0.01))
 
 # jet half-opening angle
 thetaJ = 8.5*np.pi/180 # rads
 # FR-I half-opening angle
-thetaFRI = 15*np.pi/180 #rads
+thetaFRI = 15*np.pi/180 # rads
 
 # jet solid angle
-def Omega(thetaJ):
-    return 2*np.pi*(1 - np.cos(thetaJ))
+Omega = 2*np.pi*(1 - np.cos(thetaJ))
 # FR-I solid angle
-def Chi(thetaFRI):
-    return 2*np.pi*(1 - np.cos(thetaFRI))
+Chi = 2*np.pi*(1 - np.cos(thetaFRI))
 
 
 
-## Galaxy cluster profiles
+## Galaxy cluster environmment
+# to use the 'generalised cluster environment' profiles, see the functions in Sullivan et al. 2024b
+# below we use the Perseus cluster environment from Churazov et al. 2023
 
-# parameterised functions
+# overdensity criterion
+Delta = 500
 
-# halo concentration function
-def u(c, a):
-    return 1/(int.quad(lambda s: (s**(2-a))/((1+c*s)**(3-a)), 0, 1)[0])
+# virial radius
+rvir = 1.3*Mpc # m
+# virial mass
+Mvir = (4/3)*np.pi*Delta*rho_crit*(rvir)**3 # kg
+# virial temperature
+Tvir = (1/3)*(mu*mp/kB)*G*Mvir/rvir # K
+# virial pressure
+pvir = (kB*Tvir/(mu*mp))*f_b*Delta*rho_crit # Pa = kg m^-1 s^-2
+# virial circular velocity
+vcvir = (G*Mvir/rvir)**0.5 # m s^-1
 
-# intracluster gas concentration
-def C(c, a, d, e):
-    return (d*(a - e) + c*(3 - e))/(3 - a)
+# Perseus intracluster gas density
+def Perseus_gas_density(s): # kg m^-3
+    return mu_e*mp*10**6*(3.9*10**(-2)*(1 + (s*rvir/(80*kpc))**2)**(-1.8) + 4.05*10**(-3)*(1 + (s*rvir/(280*kpc))**2)**(-0.87))
 
-# intracluster gas concentration function
-def U(c, a, d, e):
-    return 1/(int.quad(lambda s: (s**(2-e))/((1+C(c, a, d, e)*s)**(3-e)), 0, 1)[0])
+# Perseus temperature profile
+def Perseus_temperature(s): # K
+    return 1.602*10**(-16)*((7*(1 + (s*rvir/(100*kpc))**3))/(2.3 + (s*rvir/(100*kpc))**3))/kB
 
-# integral function
-def integral_func(s, c, a, d, e, eta):
-    return int.quad(lambda s_: (1/(s_**(2+e)*(1 + C(c, a, d, e)*s_)**(3-e)))*((1 - eta*f_b)*u(c, a)*int.quad(lambda s__: s__**(2-a)/((1 + c*s__)**(3-a)), 0, s_)[0] + eta*f_b*U(c, a, d, e)*int.quad(lambda s__: s__**(2-e)/((1 + C(c, a, d, e)*s__)**(3-e)), 0, s_)[0]), s, np.inf)[0]
+# negative inner logarithmic slope of Perseus' gas density profile
+e = 0
 
-# derivative of the integral function
-def integral_func_deriv(s, c, a, d, e, eta):
-    return - (1/(s**(2+e)*(1 + C(c, a, d, e)*s)**(3-e)))*((1 - eta*f_b)*u(c, a)*int.quad(lambda s_: s_**(2-a)/((1 + c*s_)**(3-a)), 0, s)[0] + eta*f_b*U(c, a, d, e)*int.quad(lambda s_: s_**(2-e)/((1 + C(c, a, d, e)*s_)**(3-e)), 0, s)[0])
+# halocentric radius
+halo_radius = np.multiply(rvir, s)
 
-
-# physical profiles of the intracluster gas
-
-# intracluster gas density
-def gas_density(s, c, a, d, e, eta): # kg m^-3
-    return Delta*rho_crit(h)*eta*f_b*U(c, a, d, e)/(3*(s**e)*(1+C(c, a, d, e)*s)**(3-e))
-
-# temperature (hydrostatic equilibrium, boundary = zero @ infinity)
-def temperature(s, c, a, d, e, eta): # K
-    return Tvir*3*s**e*(1 + C(c, a, d, e)*s)**(3-e)*integral_func(s, c, a, d, e, eta)
-
-# pressure (hydrostatic equilibrium, boundary = zero @ infinity)
-def eq_pressure(s, c, a, d, e, eta): # kg m^-1 s^-2 = Pa
-    return pvir*eta*U(c, a, d, e)*integral_func(s, c, a, d, e, eta)
-
-# sound speed (hydrostatic equilibrium, boundary = zero @ infinity)
-def sound_speed(s, c, a, d, e, eta): # m s^-1
-    return vcvir*np.sqrt(gamma*s**e*(1 + C(c, a, d, e)*s)**(3-e)*integral_func(s, c, a, d, e, eta))
-
-# intracluster gas number density
-def number_density(s, c, a, d, e, eta): # m^-3
-    return gas_density(s, c, a, d, e, eta)/(mu*mp)
-
-# derivative of pressure profile
-def eq_pressure_deriv(s, c, a, d, e, eta): # kg m^-2 s^-2 = Pa m^-1
-    return (pvir/rvir)*eta*U(c, a, d, e)*integral_func_deriv(s, c, a, d, e, eta)
-
-
-# loading the intracluster gas profiles, given a choice in environmental parameters
+# loading the intracluster gas density and temperature profiles
 gas_density_profile = np.empty(radius_bins)
 temperature_profile = np.empty(radius_bins)
-sound_speed_profile = np.empty(radius_bins)
-th_pressure_profile = np.empty(radius_bins)
-number_density_profile = np.empty(radius_bins)
 for i in range(radius_bins):
-    gas_density_profile[i] = gas_density(s[i], *environ_params) # kg m^-3
-    temperature_profile[i] = temperature(s[i], *environ_params) # K
-    sound_speed_profile[i] = sound_speed(s[i], *environ_params) # m s^-1
-    th_pressure_profile[i] = eq_pressure(s[i], *environ_params) # Pa
-    number_density_profile[i] = number_density(s[i], *environ_params) # m^-3
-th_pressure_derivative = np.gradient(th_pressure_profile, np.multiply(rvir, s)) # Pa m^-1
+    gas_density_profile[i] = Perseus_gas_density(s[i]) # kg m^-3
+    temperature_profile[i] = Perseus_temperature(s[i]) # K
+print('Perseus cluster profiles loaded')
+
+
+
+## Profiles of the intracluster gas environment
+
+# calculating the number density profiles
+number_density_profile = np.divide(gas_density_profile, (mu*mp)) # m^-3
 electron_density_profile = np.divide(gas_density_profile, mu_e*mp) # m^-3
 hydrogen_density_profile = np.multiply((4/9), number_density_profile) # m^-3
+
+# calculating the gas entropy profile
 entropy_profile = kB*np.divide(temperature_profile, np.power(electron_density_profile, 2/3)) # J m^2
+
+# calculating the thermal pressure profile and its radial derivative
+th_pressure_profile = kB*np.multiply(temperature_profile, number_density_profile) # kg m^-1 s^-2
+th_pressure_derivative = np.gradient(th_pressure_profile, halo_radius) # kg m^-2 s^-2
+
+# calculating the sound speed profile
+sound_speed_profile = np.sqrt(np.multiply(temperature_profile, (gamma*kB/(mu*mp)))) # m s^-1
+
+# calculating the thermal velocity profile
+th_velocity_profile = np.sqrt(np.multiply(temperature_profile, 3*kB/(mu*mp))) # m s^-1
+
+
 
 
 
 ## Cooling function
 
 abundance_file='mzero.cie' # metallicity for Sutherland & Dopita (1993) cooling function, here correpsonding to solar abundances
-# interperlating the cooling function from the gas temperature
-logT_cool, logLambda_cool = read_ds_cooling(abundance_file) # T_cool in K, Lambda in funny units 13 dex higher than SI value
+
+# interperlating from the gas temperature to the cooling function
+logT_cool, logLambda_cool = read_ds_cooling(abundance_file) # T in K, Lambda 13 dex higher than SI value
 logLambda_cool_interp = np.interp(np.log10(temperature_profile), logT_cool, logLambda_cool-13) # log ( W m^3 )
+# interpolated cooling function
 Lambda_cool_interp = [10**i for i in logLambda_cool_interp] # W m^3
 
 # cooling time
 t_cool_profile = (3/2)*((mu_e+mu_i)/mu)*kB*np.divide(temperature_profile, np.multiply(Lambda_cool_interp, number_density_profile)) # s
-# cooling rate
-cooling_rate = np.multiply(np.multiply(hydrogen_density_profile, hydrogen_density_profile), Lambda_cool_interp) # W m^-3
+# cooling function
+cooling_rate = np.multiply(np.square(hydrogen_density_profile), Lambda_cool_interp) # W m^-3
 
 
 
-## Population distributions
+## Jet population distribution functions
+
+# power-law slope of jet age distribution
+sT = -1
+# power-law slope of jet power; low jet power regime
+sQ1 = -1
+# power-law slope of jet power; high jet power regime
+sQ2 = -1.5
 
 # normalisation coefficient for P = x^slope
 def prob_normalisation(xmin, xmax, slope):
@@ -235,6 +194,13 @@ def prob_normalisation(xmin, xmax, slope):
         return 1/(np.log(xmax/xmin))
     else:
         return (slope+1)*(xmax**(slope+1) - xmin**(slope+1))**(-1)
+
+# inverse cumualtive probability distribution for P = x^slope
+def inv_distribution(u, xmin, xmax, slope):
+    if slope == -1:
+        return (xmin*np.exp(u/prob_normalisation(xmin, xmax, slope)))
+    else:
+        return (xmin**(slope+1) + u*(slope+1)/prob_normalisation(xmin, xmax, slope))**(1/(slope+1))
 
 # normalisation coefficient for P = x^slope1, P = x^slope2, with a cut-off at Qcut
 def prob_normalisation_dual_slope(xmin, xmax, xcut, slope1, slope2):
@@ -246,13 +212,6 @@ def prob_normalisation_dual_slope(xmin, xmax, xcut, slope1, slope2):
         A2 = (xcut**(slope2-slope1)*(xcut**(slope1+1) - xmin**(slope1+1))/(1+slope1) + (xmax**(slope2+1) - xcut**(slope2+1))/(1+slope2))**(-1)
         A1 = A2*(xcut**(slope2-slope1))
         return [A1, A2]
-
-# inverse cumualtive probability distribution for P = x^slope
-def inv_distribution(u, xmin, xmax, slope):
-    if slope == -1:
-        return (xmin*np.exp(u/prob_normalisation(xmin, xmax, slope)))
-    else:
-        return (xmin**(slope+1) + u*(slope+1)/prob_normalisation(xmin, xmax, slope))**(1/(slope+1))
 
 # inverse cumulative probability distribution for P = x^slope1, P = x^slope2, with a cut-off at Qcut
 def inv_distribution_dual_slope(u, xmin, xmax, xcut, slope1, slope2):
@@ -274,27 +233,13 @@ def inv_distribution_dual_slope(u, xmin, xmax, xcut, slope1, slope2):
                 output[i] = (xcut**(slope2+1) + u[i]*(slope2+1)/A2 - (A1*(slope1+1)/(A2*(slope2+1)))*(xcut**(slope1+1) - xmin**(slope1+1)))**(1/(slope2+1))
         return output
 
-# inverse cumulative distribution for a uniform distribution
-def inv_uniform_dist(u, xmin, xmax):
-    return xmin + u*(xmax - xmin)
-
-# power-law slope of source age distribution
-sT = -1
-# power-law slope of source power; low jet power regime
-sQ1 = -1
-# power-law slope of source power; high jet power regime
-sQ2 = -1.5
 
 
+## Escaping the brightest cluster galaxy (BCG)
 
-## Time offset for the jet to leave central galaxy
-
-# calibration constant to account for BCG properties in Young+ in prep
-A_calib = 1
-
-# time offset as a function of jet power, calibrated from Young+ in prep
+# time offset as a function of jet power, calibrated from Young+2025 in prep
 def t_min(Q, e): # s
-    return np.sqrt(A_calib)*1.27*Myr*(4/(4-e))*((3-e)/3)**0.5*(10**37/Q)**0.5
+    return 1.27*Myr*(4/(4-e))*((3-e)/3)**0.5*(10**37/Q)**0.5
 
 
 
@@ -305,410 +250,195 @@ u_vals = np.random.rand(N)
 
 # maximum jet power
 Qmax = 10**40 # W
-log_Qmax = 40
 # minimum jet power, calibrated from Young+ in prep
-Qmin = A_calib*10**37*(1.27*Myr/Gyr)**2*(4/(4-e))**2*((3-e)/3) # W
-log_Qmin = np.log10(Qmin)
+Qmin = 10**37*(1.27*Myr/Gyr)**2*(4/(4-e))**2*((3-e)/3) # W
 
 # sampling by a dual power-law probability distribution:
 Qcut = 10**38 # W
-raw_Qjet_samples = inv_distribution_dual_slope(u_vals, Qmin, Qmax, Qcut, sQ1, sQ2)
-
-# OR: sampling by a power-law probability distribution:
-# raw_Qjet_samples = inv_distribution(u_vals, Qmin, Qmax, sQ1)
-
-# OR: sampling by a uniform probability distribution
-# Qmin = 10**36
-# log_Qmin = 36
-# Qmax = 10**37
-# log_Qmax = 37
-# raw_Qjet_samples = inv_uniform_dist(u_vals, Qmin, Qmax)
-
-# histogram for jet powers
-Qjet_bins = np.logspace(log_Qmin, log_Qmax, base=10, num=14)
-raw_Qjet_hist, _ = np.histogram(raw_Qjet_samples, bins=Qjet_bins)
+Qjet_samples = inv_distribution_dual_slope(u_vals, Qmin, Qmax, Qcut, sQ1, sQ2) # W
 
 
 
-## Sampling the source age distribution
+## Sampling the jet age distribution
 
 # random real numbers on the interval [0, 1]
 u_vals = np.random.rand(N)
 
 # minimum source age
 tmin = 1*Myr # s
-log_tmin = np.log10(tmin/Myr)
 # maximum source age
 tmax = 1*Gyr # s
-log_tmax = np.log10(tmax/Myr)
 
 # sampling source ages by their distribution:
-raw_age_samples = inv_distribution(u_vals, tmin, tmax, sT)
-raw_age_samples_Myr = np.divide(raw_age_samples, Myr)
-
-# histogram for source ages
-age_bins = np.logspace(log_tmin, log_tmax, base=10, num=14)
-raw_age_hist, _ = np.histogram(raw_age_samples_Myr, bins=age_bins)
+age_samples = inv_distribution(u_vals, tmin, tmax, sT) # s
 
 
 
 ## Removing jets that cannot escape the central galaxy
 
-# time on, subtracting minimum time
-ton_samples = np.empty(N)
+# jet outburst time and escape time
+toutburst_samples = np.empty(N)
 tesc_samples = np.empty(N)
 stuck_jet_indices = np.empty(N)
 for i in range(N):
-    if raw_age_samples[i] > t_min(raw_Qjet_samples[i], e):
+    if age_samples[i] > t_min(Qjet_samples[i], e):
         stuck_jet_indices[i] = np.nan
-        tesc_samples[i] = t_min(raw_Qjet_samples[i], e)
-        ton_samples[i] = raw_age_samples[i] - t_min(raw_Qjet_samples[i], e)
-    elif raw_age_samples[i] <= t_min(raw_Qjet_samples[i], e):
+        tesc_samples[i] = t_min(Qjet_samples[i], e) # s
+        toutburst_samples[i] = age_samples[i] - t_min(Qjet_samples[i], e) # s
+    elif age_samples[i] <= t_min(Qjet_samples[i], e):
         stuck_jet_indices[i] = i
         tesc_samples[i] = np.nan
-        ton_samples[i] = np.nan
-tesc_samples = tesc_samples[~np.isnan(tesc_samples)]
-ton_samples = ton_samples[~np.isnan(ton_samples)]
+        toutburst_samples[i] = np.nan
 stuck_jet_indices = stuck_jet_indices[~np.isnan(stuck_jet_indices)]
+stuck_jet_indices = [int(i) for i in stuck_jet_indices]
+
+# updating jet powers and jet times to remove jets that do not escape
+Qjet_samples = [i for j, i in enumerate(Qjet_samples) if j not in stuck_jet_indices]
+age_samples = [i for j, i in enumerate(age_samples) if j not in stuck_jet_indices]
+toutburst_samples = [i for j, i in enumerate(toutburst_samples) if j not in stuck_jet_indices]
+tesc_samples = [i for j, i in enumerate(tesc_samples) if j not in stuck_jet_indices]
 
 # number and fraction of jets that escape the central galaxy
-N_outburst = len(ton_samples)
-escape_numbers = [N_outburst, N-N_outburst]
-escape_fractions = np.round(np.multiply(100, [N_outburst/N, (N-N_outburst)/N]), decimals=2)
-print(str(N_outburst) + ' jets escape from the galaxy')
-print(str(N-N_outburst) + ' jets do not escape from the galaxy')
-
-# updating jet powers and source ages to remove stuck jets
-Qjet_samples = [i for j, i in enumerate(raw_Qjet_samples) if j not in stuck_jet_indices]
-log_Qjet_samples = [np.log10(i) for i in Qjet_samples]
-age_samples = [i for j, i in enumerate(raw_age_samples) if j not in stuck_jet_indices]
-
-# conversion to astrophysical units
-age_samples_Myr = np.divide(age_samples, Myr)
-tesc_samples_Myr = np.divide(tesc_samples, Myr)
-ton_samples_Myr = np.divide(ton_samples, Myr)
-log_ton_samples_Myr = [np.log10(i) for i in ton_samples_Myr]
-
-# updating histograms for jet powers and source ages, with stuck jets removed
-Qjet_hist, _ = np.histogram(Qjet_samples, bins=Qjet_bins)
-age_hist, _ = np.histogram(age_samples_Myr, bins=age_bins)
+N_esc = len(toutburst_samples)
+print(str(N_esc) + ' jets escape from the central galaxy')
 
 
 
-## Considering compact sources
+## Removing jets that never reach pressure equilibrium
 
-# compact fraction
-f_compact = 0.4
-# extended fraction
-f_extended = 1 - f_compact
-# number of compact sources to consider
-N_compact = builtins.int(np.round(f_compact*N_outburst/(1-f_compact), decimals=0))
+# jet equilibrium time
+teq_samples = (2/(4-e))*(k1/(Omega*c_light))**((2-e)/4)*(gas_density_profile[s0_index]*(halo_radius[s0_index])**e)**(1/2)/((th_pressure_profile[s0_index])**((4-e)/4))*np.power(Qjet_samples, ((2-e)/4)) # s
+does_not_flare_indices = np.empty(N_esc)
+for i in range(N_esc):
+    if toutburst_samples[i] > teq_samples[i]:
+        does_not_flare_indices[i] = np.nan
+    elif toutburst_samples[i] <= teq_samples[i]:
+        does_not_flare_indices[i] = i
+does_not_flare_indices = does_not_flare_indices[~np.isnan(does_not_flare_indices)]
+does_not_flare_indices = [int(i) for i in does_not_flare_indices]
+
+# updating jet powers and jet times to remove non-flaring jets
+Qjet_samples = [i for j, i in enumerate(Qjet_samples) if j not in does_not_flare_indices]
+age_samples = [i for j, i in enumerate(age_samples) if j not in does_not_flare_indices]
+toutburst_samples = [i for j, i in enumerate(toutburst_samples) if j not in does_not_flare_indices]
+tesc_samples = [i for j, i in enumerate(tesc_samples) if j not in does_not_flare_indices]
+teq_samples = [i for j, i in enumerate(teq_samples) if j not in does_not_flare_indices]
+
+# number and fraction of jets that reach pressure equilibrium
+N_flare = len(toutburst_samples)
+print(str(N_flare) + ' jets reach pressure equilibrium and flare')
 
 
 
 ## Jet evolution model
 
-# 'ballistic jet' phase:
-
-# jet length during 'jet lobe phase'
-def R_jet_phase(t, Q, thetaJ, s0, c, a, d, e, eta): # m
-    return ((4-e)*t/2)**(2/(4-e))*(k1*Q/(Omega(thetaJ)*c_light*gas_density(s0, c, a, d, e, eta)*R0**e))**(1/(4-e))
-
-
-# solving pressure equilibrium:
-
-# time at pressure equilibrium
-def t_eq(Q, thetaJ, s0, c, a, d, e, eta): # s
-    return (2/(4-e))*(k1*Q/(Omega(thetaJ)*c_light))**((2-e)/4)*(gas_density(s0, c, a, d, e, eta)*R0**e)**(1/2)/((eq_pressure(s0, c, a, d, e, eta))**((4-e)/4))
-
-# jet length at pressure equilibrium
-def R_eq(Q, thetaJ, s0, c, a, d, e, eta): # m
-    return (k1*Q/(Omega(thetaJ)*c_light*eq_pressure(s0, c, a, d, e, eta)))**(1/2)
+# equilibrium jet lengths
+Req_samples = (k1/(Omega*c_light*th_pressure_profile[s0_index]))**(1/2)*np.sqrt(Qjet_samples) # m
 
 # jet length offset from 'flaring jet phase' up to pressure equilibrium
-def x_eq(Q, thetaJ, thetaFRI, s0, c, a, d, e, eta):
-    return R_eq(Q, thetaJ, s0, c, a, d, e, eta)*np.tan(thetaJ)/np.tan(thetaFRI) # m
+xeq_samples = np.tan(thetaJ)/np.tan(thetaFRI)*Req_samples # m
 
+# 'flaring jet' time offset
+tfj_samples = (1/2)*((4-e)/(3-e))*np.multiply(np.divide(xeq_samples, Req_samples), teq_samples) # s
 
-# 'flaring jet' phase:
+# jet outburst length
+adjusted_time_samples = np.add(np.subtract(toutburst_samples, teq_samples), tfj_samples) # s
+Routburst_samples = np.add(np.subtract(Req_samples, xeq_samples), np.multiply(xeq_samples, np.power(np.divide(adjusted_time_samples, tfj_samples), 1/(3-e)))) # m
 
-# flaring jet time offset
-def t_fj(Q, thetaJ, thetaFRI, s0, c, a, d, e, eta): # s
-    return (1/2)*((4-e)/(3-e))*(x_eq(Q, thetaJ, thetaFRI, s0, c, a, d, e, eta)/R_eq(Q, thetaJ, s0, c, a, d, e, eta))*t_eq(Q, thetaJ, s0, c, a, d, e, eta)
+# jet outburst volume
+Vjet_samples = np.empty(N_flare)
+for i in range(N_flare):
+    R = np.logspace(np.log10(Req_samples[i]), np.log10(Routburst_samples[i]), base=10, num=200)
+    Vjet_samples[i] = 4*np.pi*integrate.quad(lambda R: R**2*(1 - R/np.sqrt(R**2 + (np.tan(thetaFRI)*(R - Req_samples[i] + xeq_samples[i]))**2)), Req_samples[i], Routburst_samples[i])[0] # m^3
+Vjet_samples = np.add(4*np.pi*(1 - np.cos(thetaJ))*np.power(Req_samples, 3)/3, Vjet_samples) # m^3
 
-# jet length during 'flaring jet phase'
-def R_fj_phase(t, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta): # m
-    return R_eq(Q, thetaJ, s0, c, a, d, e, eta) - x_eq(Q, thetaJ, thetaFRI, s0, c, a, d, e, eta) + x_eq(Q, thetaJ, thetaFRI, s0, c, a, d, e, eta)*((t - t_eq(Q, thetaJ, s0, c, a, d, e, eta) + t_fj(Q, thetaJ, thetaFRI, s0, c, a, d, e, eta))/t_fj(Q, thetaJ, thetaFRI, s0, c, a, d, e, eta))**(1/(3-e))
-
-
-# the jet's solid angle and filling factor:
-
-# radius of jet cone
-def y_jet(R, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta): # m
-    return (R - R_eq(Q, thetaJ, s0, c, a, d, e, eta) + x_eq(Q, thetaJ, thetaFRI, s0, c, a, d, e, eta))*np.tan(thetaFRI)
-
-# solid angle of 'flaring jet phase' half-opening angle
-def Phi(R, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta):
-    return 2*np.pi*(1 - R/np.sqrt(R**2 + y_jet(R, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta)**2))
-
-# filling factor during 'flaring jet phase'; two cones of solid angle phi
-def filling_factor(R, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta):
-    return 1 - R/np.sqrt(R**2 + y_jet(R, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta)**2)
-
-# half-opening angle during 'flaring jet phase'
-def half_opening_angle(R, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta):
-    return np.arccos(R/np.sqrt(R**2 + y_jet(R, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta)**2))
-
-# volume occupied by filling factor, assuming a conical volume
-def jet_filling_vol(Rjet, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta):
-    if Rjet <= R_eq(Q, thetaJ, s0, c, a, d, e, eta):
-        return 2*np.pi*(1 - np.cos(thetaJ))*R_eq(Q, thetaJ, s0, c, a, d, e, eta)**3/3
-    if Rjet > R_eq(Q, thetaJ, s0, c, a, d, e, eta):
-        R = np.logspace(-3, np.log10(Rjet), base=10, num=150)
-        return 2*np.pi*(1 - np.cos(thetaJ))*R_eq(Q, thetaJ, s0, c, a, d, e, eta)**3/3 + 2*np.pi*int.quad(lambda R: R**2*filling_factor(R, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta), R_eq(Q, thetaJ, s0, c, a, d, e, eta), Rjet)[0]
+# largest jet outburst
+print('the largest jet reaches: ' + str(np.round(max(Routburst_samples)/kpc, decimals=2)) + 'kpc')
 
 
 
-## Sampling the jet evolution model
-
-# appending the jet length, equilibrium time, flaring jet offset time and jet length at pressure equilibrium
-teq_samples = np.empty(N_outburst)
-tfj_samples = np.empty(N_outburst)
-Req_samples = np.empty(N_outburst)
-Rjet_samples = np.empty(N_outburst)
-does_not_flare_indices = np.empty(N_outburst)
-for i in range(N_outburst):
-    teq_samples[i] = t_eq(Qjet_samples[i], thetaJ, s0, *environ_params)
-    tfj_samples[i] = t_fj(Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params)
-    if ton_samples[i] > teq_samples[i]:
-        does_not_flare_indices[i] = np.nan
-        Rjet_samples[i] = R_fj_phase(ton_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params)
-        Req_samples[i] = R_eq(Qjet_samples[i], thetaJ, s0, *environ_params)
-    elif ton_samples[i] <= teq_samples[i]:
-        does_not_flare_indices[i] = i
-        Rjet_samples[i] = R_jet_phase(ton_samples[i], Qjet_samples[i], thetaJ, s0, *environ_params)
-        Req_samples[i] = np.nan
-does_not_flare_indices = does_not_flare_indices[~np.isnan(does_not_flare_indices)]
-
-# appending the filling factor, half-opening angle and scaled halo radius
-filling_factor_samples = np.empty((N_outburst, 150))
-half_angle_samples = np.empty((N_outburst, 150))
-scaled_halo_radii_samples = np.empty((N_outburst, 150))
-for i in range(N_outburst):
-    if ton_samples[i] > teq_samples[i]:
-        Rjet_halo_radii = np.logspace(np.log10(rres), np.log10(Rjet_samples[i]), base=10, num=150)
-        jet_phase_steps = round(150*(np.log10(Req_samples[i]) + np.log10(rres))/(np.log10(Rjet_samples[i]) + np.log10(rres)))
-        flaring_jet_phase_steps = round(150*(np.log10(Rjet_samples[i]) - np.log10(Req_samples[i]))/(np.log10(Rjet_samples[i]) + np.log10(rres)))
-        jet_phase_radii = np.logspace(np.log10(rres), np.log10(Req_samples[i]), base=10, num=jet_phase_steps)
-        flaring_jet_phase_radii = np.logspace(np.log10(Req_samples[i]), np.log10(Rjet_samples[i]), base=10, num=flaring_jet_phase_steps)
-        scaled_halo_radii_samples[i] = np.divide(Rjet_halo_radii, rvir)
-
-        jet_phase_filling_factor = [1 - np.cos(thetaJ)]*jet_phase_steps
-        flaring_jet_phase_filling_factor = filling_factor(flaring_jet_phase_radii, Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params)
-        jet_phase_half_angle = [thetaJ]*jet_phase_steps
-        flaring_jet_half_angle = half_opening_angle(flaring_jet_phase_radii, Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params)
-
-        filling_factor_samples[i] = [*jet_phase_filling_factor, *flaring_jet_phase_filling_factor]
-        half_angle_samples[i] = [*jet_phase_half_angle, *flaring_jet_half_angle]
-    elif ton_samples[i] <= teq_samples[i]:
-        Rjet_halo_radii = np.logspace(np.log10(rres), np.log10(Rjet_samples[i]), base=10, num=150)
-        scaled_halo_radii_samples[i] = np.divide(Rjet_halo_radii, rvir)
-
-        filling_factor_samples[i] = [1 - np.cos(thetaJ)]*150
-        half_angle_samples[i] = [thetaJ]*150
-
-# number and fraction of jet sources that flare
-N_flare = N_outburst - len(does_not_flare_indices)
-flaring_numbers = [N_flare, N_outburst-N_flare]
-flaring_fractions = np.round(np.multiply(100, [N_flare/N_outburst, (N_outburst-N_flare)/N_outburst]), decimals=2)
-print(str(N_flare) + ' jets reach pressure equilibrium and flare')
-print(str(N_outburst-N_flare) + ' jets never flare')
-
-# jet lengths of sources that do not flare
-Rjet_samples_no_flare = [i for j, i in enumerate(Rjet_samples) if j in does_not_flare_indices]
-
-# conversion to astrophysical units
-teq_samples_Myr = np.divide(teq_samples, Myr)
-tfj_samples_Myr = np.divide(tfj_samples, Myr)
-Req_samples_kpc = np.divide(Req_samples, kpc)
-Rjet_samples_kpc = np.divide(Rjet_samples, kpc)
-Rjet_samples_no_flare_kpc = np.divide(Rjet_samples_no_flare, kpc)
-print('the largest jet reaches: ' + str(max(Rjet_samples_kpc)) + ' kpc')
-
-# histograms for jet lengths and equilibrium jet lengths
-Rjet_bins = np.logspace(np.log10(min(Req_samples_kpc)), np.log10(max(Rjet_samples_kpc)), base=10, num=14)
-Rjet_hist, _ = np.histogram(Rjet_samples_kpc, bins=Rjet_bins)
-Req_hist, _ = np.histogram(Req_samples_kpc, bins=Rjet_bins)
-Rjet_no_flare_hist, _ = np.histogram(Rjet_samples_no_flare_kpc, bins=Rjet_bins)
-
-# histograms for outburst times and equilibrium times
-ton_bins = np.logspace(np.log10(min(ton_samples_Myr)), np.log10(max(ton_samples_Myr)), base=10, num=14)
-ton_hist, _ = np.histogram(ton_samples_Myr, bins=ton_bins)
-teq_hist, _ = np.histogram(teq_samples_Myr, bins=ton_bins)
-
-
-## Calculating the velocity kicks from the jet heating model
+## Calculating the velocity kicks in the jet heating model
 
 # gas velocity kicks per energy injection rate
-velocity_per_volumetric_energy_rate = np.divide((gamma-1), (np.add(th_pressure_derivative, np.multiply(2*gamma, np.divide(th_pressure_profile, rvir*s)))))
+velocity_per_volumetric_energy_rate = np.divide((gamma-1), (np.add(th_pressure_derivative, np.multiply(2*gamma, np.divide(th_pressure_profile, halo_radius))))) # m^2 s^2 kg^-1
 
-# volumetric heating rates and the heating-induced velocity kicks
-duty01_heating_rate_samples = np.empty(N_outburst)
-duty02_heating_rate_samples = np.empty(N_outburst)
-duty03_heating_rate_samples = np.empty(N_outburst)
-duty01_heating_velocity_kick_samples = np.empty((N_outburst, radius_bins))
-duty02_heating_velocity_kick_samples = np.empty((N_outburst, radius_bins))
-duty03_heating_velocity_kick_samples = np.empty((N_outburst, radius_bins))
-for i in range(N_outburst):
-    Rjet_conical_volume = jet_filling_vol(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params)
-    heat_vals_samples = Qjet_samples[i]/Rjet_conical_volume
-    duty01_heating_rate_samples[i] = 0.1*heat_vals_samples
-    duty02_heating_rate_samples[i] = 0.2*heat_vals_samples
-    duty03_heating_rate_samples[i] = 0.3*heat_vals_samples
-    duty01_heating_velocity_kick_samples[i] = 0.1*heat_vals_samples*velocity_per_volumetric_energy_rate
-    duty02_heating_velocity_kick_samples[i] = 0.2*heat_vals_samples*velocity_per_volumetric_energy_rate
-    duty03_heating_velocity_kick_samples[i] = 0.3*heat_vals_samples*velocity_per_volumetric_energy_rate
+# the volumetric heating rate
+heating_rate_samples = np.divide(np.multiply(Qjet_samples, 2), Vjet_samples) # W m^-3
+
+# the heating-induced velocity kick
+heating_velocity_kick_samples = np.empty((N_flare, radius_bins))
+for i in range(N_flare):
+    heating_velocity_kick_samples[i] = velocity_per_volumetric_energy_rate*heating_rate_samples[i] # m s^-1
 
 # the cooling-induced velocity kick
-cooling_velocity_kicks = cooling_rate*velocity_per_volumetric_energy_rate
-
-# interpolating the filling factor
-interpolated_filling_factor = np.zeros((N_outburst, radius_bins))
-for i, subarray in enumerate(filling_factor_samples):
-    interpolator = interp1d(scaled_halo_radii_samples[i], subarray, kind='linear', bounds_error=False)
-    interpolated_filling_factor[i] = interpolator(s)
-interpolated_filling_factor[np.isnan(interpolated_filling_factor)] = 0
-
-# the effective velocity kicks and volumetric energy injection rates
-duty01_effective_velocity_kick_samples = np.empty((N_outburst, radius_bins))
-duty02_effective_velocity_kick_samples = np.empty((N_outburst, radius_bins))
-duty03_effective_velocity_kick_samples = np.empty((N_outburst, radius_bins))
-duty01_effective_energy_injection_samples = np.empty((N_outburst, radius_bins))
-duty02_effective_energy_injection_samples = np.empty((N_outburst, radius_bins))
-duty03_effective_energy_injection_samples = np.empty((N_outburst, radius_bins))
-for i in range(N_outburst):
-    duty01_effective_velocity_kick_samples[i] = np.sqrt(np.add(np.multiply(interpolated_filling_factor[i], np.square(duty01_heating_velocity_kick_samples[i])), np.multiply(np.subtract(1, interpolated_filling_factor[i]), np.square(cooling_velocity_kicks))))
-    duty02_effective_velocity_kick_samples[i] = np.sqrt(np.add(np.multiply(interpolated_filling_factor[i], np.square(duty02_heating_velocity_kick_samples[i])), np.multiply(np.subtract(1, interpolated_filling_factor[i]), np.square(cooling_velocity_kicks))))
-    duty03_effective_velocity_kick_samples[i] = np.sqrt(np.add(np.multiply(interpolated_filling_factor[i], np.square(duty03_heating_velocity_kick_samples[i])), np.multiply(np.subtract(1, interpolated_filling_factor[i]), np.square(cooling_velocity_kicks))))
-    duty01_effective_energy_injection_samples[i] = np.sqrt(np.add(np.multiply(interpolated_filling_factor[i], np.square(duty01_heating_rate_samples[i])), np.multiply(np.subtract(1, interpolated_filling_factor[i]), np.square(cooling_rate))))
-    duty02_effective_energy_injection_samples[i] = np.sqrt(np.add(np.multiply(interpolated_filling_factor[i], np.square(duty02_heating_rate_samples[i])), np.multiply(np.subtract(1, interpolated_filling_factor[i]), np.square(cooling_rate))))
-    duty03_effective_energy_injection_samples[i] = np.sqrt(np.add(np.multiply(interpolated_filling_factor[i], np.square(duty03_heating_rate_samples[i])), np.multiply(np.subtract(1, interpolated_filling_factor[i]), np.square(cooling_rate))))
+cooling_velocity_kicks = np.multiply(cooling_rate, velocity_per_volumetric_energy_rate) # m s^-1
 
 
 
-## Calculating the non-thermal pressure from the jet heating model
+## Calculating the effective feedback profiles
 
-# NTP as the kinetic to total energy density ratio for each source
-duty01_NTP_samples = np.empty((N_outburst, radius_bins))
-duty02_NTP_samples = np.empty((N_outburst, radius_bins))
-duty03_NTP_samples = np.empty((N_outburst, radius_bins))
-for i in range(N_outburst):
-    duty01_NTP_samples[i] = np.divide(1, np.add(1, (3*kB/(mu*mp))*np.divide(temperature_profile, np.square(duty01_effective_velocity_kick_samples[i]))))
-    duty02_NTP_samples[i] = np.divide(1, np.add(1, (3*kB/(mu*mp))*np.divide(temperature_profile, np.square(duty02_effective_velocity_kick_samples[i]))))
-    duty03_NTP_samples[i] = np.divide(1, np.add(1, (3*kB/(mu*mp))*np.divide(temperature_profile, np.square(duty03_effective_velocity_kick_samples[i]))))
+# the filling factor of the cluster
+filling_factor_samples = np.empty((N_flare, radius_bins))
+unfilled_factor_samples = np.empty((N_flare, radius_bins))
+for i in range(N_flare):
+    Rjet_index = np.argmin(np.abs(halo_radius.reshape(radius_bins, 1) - Routburst_samples[i]))
+    Req_index = np.argmin(np.abs(halo_radius.reshape(radius_bins, 1) - Req_samples[i]))
+    for j in range(radius_bins):
+            if j <= Req_index:
+                filling_factor_samples[i, j] = (1 - np.cos(thetaJ))
+                unfilled_factor_samples[i, j] = np.cos(thetaJ)
+            elif Req_index < j < Rjet_index:
+                filling_factor_samples[i, j] = 1 - halo_radius[j]/np.sqrt(halo_radius[j]**2 + (np.tan(thetaFRI)*(halo_radius[j] - Req_samples[i] + xeq_samples[i]))**2)
+                unfilled_factor_samples[i, j] = halo_radius[j]/np.sqrt(halo_radius[j]**2 + (np.tan(thetaFRI)*(halo_radius[j] - Req_samples[i] + xeq_samples[i]))**2)
+            elif j > Rjet_index:
+                filling_factor_samples[i, j] = 0
+                unfilled_factor_samples[i, j] = 1
+
+# calculating the effective energy injection and velocity kick profiles, weighted by their volume contribution
+effective_velocity_kick_samples = np.empty((N_flare, radius_bins))
+effective_energy_injection_samples = np.empty((N_flare, radius_bins))
+for i in range(N_flare):
+    effective_velocity_kick_samples[i] = np.sqrt(np.add(np.multiply(filling_factor_samples[i], duty*np.square(heating_velocity_kick_samples[i])), np.multiply(unfilled_factor_samples[i], np.square(cooling_velocity_kicks)))) # m s^-1
+    effective_energy_injection_samples[i] = np.sqrt(np.add(np.multiply(filling_factor_samples[i], duty*np.square(heating_rate_samples[i])), np.multiply(unfilled_factor_samples[i], np.square(cooling_rate)))) # W m^-3
 
 
 
-## Including the compact source population
+# calculating the NTP fraction
+NTP_samples = np.empty((N_flare, radius_bins))
+for i in range(N_flare):
+    NTP_samples[i] = np.divide(np.square(effective_velocity_kick_samples[i]), np.add(np.square(effective_velocity_kick_samples[i]), np.square(th_velocity_profile))) # %
+
+
+
+## Including the compact source population in the feedback profiles
+
+# compact fraction
+f_compact = 0.4
+# number of compact sources to consider
+N_compact = int(np.round(f_compact*N_flare/(1-f_compact), decimals=0))
 
 # the cooling-only velocity kick and cooling-only volumetric energy injection rates
-compact_source_velocity_samples = np.tile([cooling_velocity_kicks], (N_compact, 1))
-compact_energy_injection_samples = np.tile([cooling_rate], (N_compact, 1))
+compact_source_velocity_samples = np.tile([cooling_velocity_kicks], (N_compact, 1)) # m s^-1
+compact_energy_injection_samples = np.tile([cooling_rate], (N_compact, 1)) # W m^-3
 
 # the cooling-only non-thermal pressure
-cooling_only_NTP = np.divide(1, np.add(1, (3*kB/(mu*mp))*np.divide(temperature_profile, np.square(cooling_velocity_kicks))))
-cooling_only_NTP_samples = np.tile([cooling_only_NTP], (N_compact, 1))
+cooling_only_NTP = np.divide(np.square(cooling_velocity_kicks), np.add(np.square(cooling_velocity_kicks), np.square(th_velocity_profile))) # %
+cooling_only_NTP_samples = np.tile([cooling_only_NTP], (N_compact, 1)) # %
 
 
 
-## Averaging the feedback properties for the entire AGN population
+## Calculating the mean feedback profiles
 
-# calculating the mean effective gas velocity kicks
-duty01_mean_effective_velocity = np.mean(np.concatenate((duty01_effective_velocity_kick_samples, compact_source_velocity_samples)), axis=0)
-duty02_mean_effective_velocity = np.mean(np.concatenate((duty02_effective_velocity_kick_samples, compact_source_velocity_samples)), axis=0)
-duty03_mean_effective_velocity = np.mean(np.concatenate((duty03_effective_velocity_kick_samples, compact_source_velocity_samples)), axis=0)
-# calculating the mean effective volumetric energy injection rates
-duty01_mean_effective_energy_injection = np.mean(np.concatenate((duty01_effective_energy_injection_samples, compact_energy_injection_samples)), axis=0)
-duty02_mean_effective_energy_injection = np.mean(np.concatenate((duty02_effective_energy_injection_samples, compact_energy_injection_samples)), axis=0)
-duty03_mean_effective_energy_injection = np.mean(np.concatenate((duty03_effective_energy_injection_samples, compact_energy_injection_samples)), axis=0)
+# calculating the mean effective gas velocity kicks (for extended + compact sources)
+mean_effective_velocity = np.mean(np.concatenate((effective_velocity_kick_samples, compact_source_velocity_samples)), axis=0) # m s^-1
 
-# converting velocities to km s^-1
-sound_speed_profile_kms = np.divide(sound_speed_profile, 10**3)
-cooling_velocity_kicks_kms = np.divide(cooling_velocity_kicks, 10**3)
-duty01_effective_velocity_kms = np.divide(duty01_effective_velocity_kick_samples, 10**3)
-duty02_effective_velocity_kms = np.divide(duty02_effective_velocity_kick_samples, 10**3)
-duty03_effective_velocity_kms = np.divide(duty03_effective_velocity_kick_samples, 10**3)
-duty01_mean_effective_velocity_kms = np.divide(duty01_mean_effective_velocity, 10**3)
-duty02_mean_effective_velocity_kms = np.divide(duty02_mean_effective_velocity, 10**3)
-duty03_mean_effective_velocity_kms = np.divide(duty03_mean_effective_velocity, 10**3)
+# calculating the mean effective volumetric energy injection rates (for extended + compact sources)
+mean_effective_energy_injection = np.mean(np.concatenate((effective_energy_injection_samples, compact_energy_injection_samples)), axis=0) # W m^-3
 
-# calculating the mean non-thermal pressure profiles
-duty01_mean_NTP = np.mean(np.concatenate((duty01_NTP_samples, cooling_only_NTP_samples)), axis=0)
-duty02_mean_NTP = np.mean(np.concatenate((duty02_NTP_samples, cooling_only_NTP_samples)), axis=0)
-duty03_mean_NTP = np.mean(np.concatenate((duty03_NTP_samples, cooling_only_NTP_samples)), axis=0)
+# calculating the mean non-thermal pressure profiles (for extended + compact sources)
+mean_NTP = np.mean(np.concatenate((NTP_samples, cooling_only_NTP_samples)), axis=0) # %
 
+# the peak mean NTP fraction
+print('the peak mean NTP fraction is: ' + str(np.round(100*np.max(mean_NTP), decimals=1)) + '%')
+print('this peak occurs at a halo radius of: ' + str(np.round(halo_radius[np.argmin(np.abs(mean_NTP - np.max(mean_NTP)))]/kpc, decimals=2)) + 'kpc')
 
-
-## Galaxy cluster energy integrals
-
-# kinetic energy integrated over AGN volume
-def kinetic_energy(Rjet, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta, duty):
-    if Rjet <= R_eq(Q, thetaJ, s0, c, a, d, e, eta):
-        R = np.logspace(-3, np.log10(Rjet), base=10, num=150)
-        V_eq = 2*np.pi*(1 - np.cos(thetaJ))*R_eq(Q, thetaJ, s0, c, a, d, e, eta)**3/3
-        return (2*np.pi*(1 - np.cos(thetaJ))*(gamma-1)**2*(duty*Q)**2/V_eq**2)*int.quad(lambda R: R**2*gas_density(R/rvir, c, a, d, e, eta)/((eq_pressure_deriv(R/rvir, c, a, d, e, eta) + 2*gamma*eq_pressure(R/rvir, c, a, d, e, eta)/R)**2), 0, Rjet)[0]
-    if Rjet > R_eq(Q, thetaJ, s0, c, a, d, e, eta):
-        R = np.logspace(-3, np.log10(Rjet), base=10, num=150)
-        V_jet = 2*np.pi*(1 - np.cos(thetaJ))*R_eq(Q, thetaJ, s0, c, a, d, e, eta)**3/3 + 2*np.pi*int.quad(lambda R: R**2*filling_factor(R, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta), R_eq(Q, thetaJ, s0, c, a, d, e, eta), Rjet)[0]
-        return (2*np.pi*(gamma-1)**2*(duty*Q)**2/V_jet**2)*((1 - np.cos(thetaJ))*int.quad(lambda R: R**2*gas_density(R/rvir, c, a, d, e, eta)/((eq_pressure_deriv(R/rvir, c, a, d, e, eta) + 2*gamma*eq_pressure(R/rvir, c, a, d, e, eta)/R)**2), 0, R_eq(Q, thetaJ, s0, c, a, d, e, eta))[0] + int.quad(lambda R: filling_factor(R, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta)*R**2*gas_density(R/rvir, c, a, d, e, eta)/((eq_pressure_deriv(R/rvir, c, a, d, e, eta) + 2*gamma*eq_pressure(R/rvir, c, a, d, e, eta)/R)**2), R_eq(Q, thetaJ, s0, c, a, d, e, eta), Rjet)[0])
-
-# thermal energy integrated over non-AGN volume
-def thermal_energy(Rjet, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta):
-    if Rjet <= R_eq(Q, thetaJ, s0, c, a, d, e, eta):
-        R = np.logspace(-3, np.log10(Rjet), base=10, num=150)
-        return (6*np.pi*(1- np.cos(thetaJ))/(mu*mp))*int.quad(lambda R: R**2*gas_density(R/rvir, c, a, d, e, eta)*kB*temperature(R/rvir, c, a, d, e, eta), 0, Rjet)[0]
-    if Rjet > R_eq(Q, thetaJ, s0, c, a, d, e, eta):
-        R = np.logspace(-3, np.log10(Rjet), base=10, num=150)
-        return (6*np.pi*(1- np.cos(thetaJ))/(mu*mp))*int.quad(lambda R: R**2*gas_density(R/rvir, c, a, d, e, eta)*kB*temperature(R/rvir, c, a, d, e, eta), R_eq(Q, thetaJ, s0, c, a, d, e, eta), Rjet)[0] + (6*np.pi/(mu*mp))*int.quad(lambda R: R**2*gas_density(R/rvir, c, a, d, e, eta)*kB*temperature(R/rvir, c, a, d, e, eta)*(filling_factor(R, Q, thetaJ, thetaFRI, s0, c, a, d, e, eta)), R_eq(Q, thetaJ, s0, c, a, d, e, eta), Rjet)[0]
-
-# thermal energy integrated over entire volume
-def thermal_energy_total(Rjet, Q):
-    R = np.logspace(-3, np.log10(Rjet), base=10, num=150)
-    return (6*np.pi/(mu*mp))*int.quad(lambda R: R**2*gas_density(R/rvir, c, a, d, e, eta)*kB*temperature(R/rvir, c, a, d, e, eta), 0, Rjet)[0]
-
-
-
-## Calculating the energy coupling of the model
-
-# calculating thermal and kinetic energy integrated over the cluster
-thermal_energy_samples = np.empty((N_outburst))
-duty01_kinetic_energy_samples = np.empty((N_outburst))
-duty02_kinetic_energy_samples = np.empty((N_outburst))
-duty03_kinetic_energy_samples = np.empty((N_outburst))
-duty04_kinetic_energy_samples = np.empty((N_outburst))
-duty05_kinetic_energy_samples = np.empty((N_outburst))
-duty1_kinetic_energy_samples = np.empty((N_outburst))
-for i in range(N_outburst):
-    thermal_energy_samples[i] = thermal_energy(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params)
-    duty01_kinetic_energy_samples[i] = kinetic_energy(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params, duty=0.1)
-    duty02_kinetic_energy_samples[i] = kinetic_energy(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params, duty=0.2)
-    duty03_kinetic_energy_samples[i] = kinetic_energy(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params, duty=0.3)
-    duty04_kinetic_energy_samples[i] = kinetic_energy(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params, duty=0.4)
-    duty05_kinetic_energy_samples[i] = kinetic_energy(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params, duty=0.5)
-    duty1_kinetic_energy_samples[i] = kinetic_energy(Rjet_samples[i], Qjet_samples[i], thetaJ, thetaFRI, s0, *environ_params, duty=1)
-
-# calculating the kinetic energy coupling efficiency
-duty01_kinetic_coupling_samples = np.divide(duty01_kinetic_energy_samples, 2*np.multiply(Qjet_samples, ton_samples))
-duty02_kinetic_coupling_samples = np.divide(duty02_kinetic_energy_samples, 2*np.multiply(Qjet_samples, ton_samples))
-duty03_kinetic_coupling_samples = np.divide(duty03_kinetic_energy_samples, 2*np.multiply(Qjet_samples, ton_samples))
-duty04_kinetic_coupling_samples = np.divide(duty04_kinetic_energy_samples, 2*np.multiply(Qjet_samples, ton_samples))
-duty05_kinetic_coupling_samples = np.divide(duty05_kinetic_energy_samples, 2*np.multiply(Qjet_samples, ton_samples))
-duty1_kinetic_coupling_samples = np.divide(duty1_kinetic_energy_samples, 2*np.multiply(Qjet_samples, ton_samples))
-
-# calculating the mean kinetic energy coupling efficiency at each outburst radius
-Rjet_global = np.logspace(np.log10(min(Rjet_samples)), np.log10(max(Rjet_samples)), base=10, num=100)
-Rjet_bin_inds = np.digitize(Rjet_samples, Rjet_global)
-Rjet_bin_centres = 0.5*(Rjet_global[1:] + Rjet_global[:-1])
-mean_fit_duty01_kinetic_coupling_v_Rjet = [duty01_kinetic_coupling_samples[Rjet_bin_inds==i].mean() if np.count_nonzero(Rjet_bin_inds==i)>=10 else np.nan for i in range(1, 100)]
-mean_fit_duty02_kinetic_coupling_v_Rjet = [duty02_kinetic_coupling_samples[Rjet_bin_inds==i].mean() if np.count_nonzero(Rjet_bin_inds==i)>=10 else np.nan for i in range(1, 100)]
-mean_fit_duty03_kinetic_coupling_v_Rjet = [duty03_kinetic_coupling_samples[Rjet_bin_inds==i].mean() if np.count_nonzero(Rjet_bin_inds==i)>=10 else np.nan for i in range(1, 100)]
