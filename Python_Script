@@ -237,7 +237,7 @@ def inv_distribution_dual_slope(u, xmin, xmax, xcut, slope1, slope2):
 
 ## Escaping the brightest cluster galaxy (BCG)
 
-# time offset as a function of jet power, calibrated from Young+2025 in prep
+# time offset as a function of jet power, calibrated from Young et al. 2024
 def t_min(Q, e): # s
     return 1.27*Myr*(4/(4-e))*((3-e)/3)**0.5*(10**37/Q)**0.5
 
