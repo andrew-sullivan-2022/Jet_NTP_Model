@@ -136,10 +136,6 @@ for i in range(radius_bins):
     temperature_profile[i] = Perseus_temperature(s[i]) # K
 print('Perseus cluster profiles loaded')
 
-
-
-## Profiles of the intracluster gas environment
-
 # calculating the number density profiles
 number_density_profile = np.divide(gas_density_profile, (mu*mp)) # m^-3
 electron_density_profile = np.divide(gas_density_profile, mu_e*mp) # m^-3
@@ -157,8 +153,6 @@ sound_speed_profile = np.sqrt(np.multiply(temperature_profile, (gamma*kB/(mu*mp)
 
 # calculating the thermal velocity profile
 th_velocity_profile = np.sqrt(np.multiply(temperature_profile, 3*kB/(mu*mp))) # m s^-1
-
-
 
 
 
@@ -400,8 +394,6 @@ effective_energy_injection_samples = np.empty((N_flare, radius_bins))
 for i in range(N_flare):
     effective_velocity_kick_samples[i] = np.sqrt(np.add(np.multiply(filling_factor_samples[i], duty*np.square(heating_velocity_kick_samples[i])), np.multiply(unfilled_factor_samples[i], np.square(cooling_velocity_kicks)))) # m s^-1
     effective_energy_injection_samples[i] = np.sqrt(np.add(np.multiply(filling_factor_samples[i], duty*np.square(heating_rate_samples[i])), np.multiply(unfilled_factor_samples[i], np.square(cooling_rate)))) # W m^-3
-
-
 
 # calculating the NTP fraction
 NTP_samples = np.empty((N_flare, radius_bins))
