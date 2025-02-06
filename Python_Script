@@ -173,7 +173,7 @@ cooling_rate = np.multiply(np.square(hydrogen_density_profile), Lambda_cool_inte
 
 
 
-## Jet population distribution functions
+## Population distribution functions
 
 # power-law slope of jet age distribution
 sT = -1
@@ -229,7 +229,7 @@ def inv_distribution_dual_slope(u, xmin, xmax, xcut, slope1, slope2):
 
 
 
-## Escaping the brightest cluster galaxy (BCG)
+## Calibration to escape the brightest cluster galaxy (BCG)
 
 # time offset as a function of jet power, calibrated from Young et al. 2024
 def t_min(Q, e): # s
@@ -324,7 +324,7 @@ print(str(N_flare) + ' jets reach pressure equilibrium and flare')
 
 
 
-## Jet evolution model
+## Evoluving jet outbursts in the model
 
 # equilibrium jet lengths
 Req_samples = (k1/(Omega*c_light*th_pressure_profile[s0_index]))**(1/2)*np.sqrt(Qjet_samples) # m
@@ -351,7 +351,7 @@ print('the largest jet reaches: ' + str(np.round(max(Routburst_samples)/kpc, dec
 
 
 
-## Calculating the velocity kicks in the jet heating model
+## Calculating the velocity kicks of each outburst
 
 # gas velocity kicks per energy injection rate
 velocity_per_volumetric_energy_rate = np.divide((gamma-1), (np.add(th_pressure_derivative, np.multiply(2*gamma, np.divide(th_pressure_profile, halo_radius))))) # m^2 s^2 kg^-1
@@ -369,7 +369,7 @@ cooling_velocity_kicks = np.multiply(cooling_rate, velocity_per_volumetric_energ
 
 
 
-## Calculating the effective feedback profiles
+## Calculating the effective feedback profiles of each outburst
 
 # the filling factor of the cluster
 filling_factor_samples = np.empty((N_flare, radius_bins))
@@ -402,7 +402,7 @@ for i in range(N_flare):
 
 
 
-## Including the compact source population in the feedback profiles
+## Including the compact source population
 
 # compact fraction
 f_compact = 0.4
@@ -419,7 +419,7 @@ cooling_only_NTP_samples = np.tile([cooling_only_NTP], (N_compact, 1)) # %
 
 
 
-## Calculating the mean feedback profiles
+## Calculating the mean feedback profiles over all (extended + compact) sources
 
 # calculating the mean effective gas velocity kicks (for extended + compact sources)
 mean_effective_velocity = np.mean(np.concatenate((effective_velocity_kick_samples, compact_source_velocity_samples)), axis=0) # m s^-1
