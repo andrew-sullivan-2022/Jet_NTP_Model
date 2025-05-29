@@ -381,7 +381,7 @@ for i in range(N_flare):
             if j <= Req_index:
                 filling_factor_samples[i, j] = (1 - np.cos(thetaJ))
                 unfilled_factor_samples[i, j] = np.cos(thetaJ)
-            elif Req_index < j < Rjet_index:
+            elif Req_index < j <= Rjet_index:
                 filling_factor_samples[i, j] = 1 - halo_radius[j]/np.sqrt(halo_radius[j]**2 + (np.tan(thetaFRI)*(halo_radius[j] - Req_samples[i] + xeq_samples[i]))**2)
                 unfilled_factor_samples[i, j] = halo_radius[j]/np.sqrt(halo_radius[j]**2 + (np.tan(thetaFRI)*(halo_radius[j] - Req_samples[i] + xeq_samples[i]))**2)
             elif j > Rjet_index:
