@@ -35,7 +35,7 @@ mp = 1.6726*10**(-27) # kg
 ## Cosmological constants
 
 # hubble parameter
-h = 0.6715
+h = 0.6751
 # present-day critical density of the universe
 rho_crit = 1.8788*10**(-26)*h**2 # kg m^-3
 # density parameters
