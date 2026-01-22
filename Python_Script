@@ -158,7 +158,7 @@ th_velocity_profile = np.sqrt(np.multiply(temperature_profile, 3*kB/(mu*mp))) # 
 
 ## Cooling function
 
-abundance_file='mzero.cie' # metallicity for Sutherland & Dopita (1993) cooling function, here correpsonding to solar abundances
+abundance_file='mzero.cie' # metallicity for Sutherland & Dopita (1993) cooling function, here corresponding to primordial abundances
 
 # interperlating from the gas temperature to the cooling function
 logT_cool, logLambda_cool = read_ds_cooling(abundance_file) # T in K, Lambda 13 dex higher than SI value
