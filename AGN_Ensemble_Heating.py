@@ -62,9 +62,9 @@ def save_nested_arrays(filename, data):
             if i != len(data) - 1:
                 f.write("\n")
 
-## AGN ensemble-average heating model
+## Jet ensemble-average heating model
 # function for calculating heating rate, velocity kick and NTP fraction
-def calculate_ensemble_AGN_heating(log_Qjet_vals, log_age_vals, duty_cycle, gas_density_profile, temperature_profile, halo_radius):
+def calculate_ensemble_jet_heating(log_Qjet_vals, log_age_vals, duty_cycle, gas_density_profile, temperature_profile, halo_radius):
     ## Inputs
     # loading jet powers
     log_Qjet_vals = np.atleast_1d(log_Qjet_vals) # log W
