@@ -31,7 +31,7 @@ f_b = Omega_b/(Omega_b + Omega_DM)
 # solar mass
 Msol = 1.989*10**30 # kg
 # year
-yr = 3.156*10**7
+yr = 3.156*10**7 # s
 # megayear
 Myr = 3.156*10**13 # s
 # gigayear
