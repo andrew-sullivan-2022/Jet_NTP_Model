@@ -57,6 +57,6 @@ Creates array files (.txt) for:
 
 **_NTP_fraction_ : array-like**
 
-  Ensemble-averaged fraction of non-thermal pressure to total pressure [percent] 
+  Ensemble-averaged fraction of non-thermal pressure to total pressure [percent] imparted on the gas
 
 ______________________________________________________________________________________
