@@ -1,45 +1,62 @@
-Function for calculating ensemble-average jet heating:
+**Function for calculating AGN heating:**
+-----------------------------------------
 
-calculate_AGN_heating(log_Qjet_vals, log_active_age_vals, duty_cycle, gas_density_profile, temperature_profile, halo_radius)
+**calculate_AGN_heating**(**log_Qjet_vals**,   **log_active_age_vals**,   **duty_cycle**,   **redshift**,   **gas_density_profile**,   **temperature_profile**,   **halo_radius**,   **log_dt**=_0.01_)
 
-Parameters:
+________________________
+__Parameters:__
 
-log_Qjet_vals : float or array-like
+
+**_log_Qjet_vals_ : float or array-like**
+
 
 Logarithmic jet power [log W]
 
-log_active_age_vals : float or array-like
+
+**_log_active_age_vals_ : float or array-like**
+
 
 Logarithmic active age [log yr]
 
-duty_cycle : float or array-like
+
+**_duty_cycle_ : float or array-like**
+
 
 Duty cycle of the AGN [percent]
 
-gas_density_profile : array-like
 
-Gas density [kg/m^3] of the environment, with values corresponding to halo_radius
+**_gas_density_profile_ : array-like**
 
-temperature_profile : array-like
+  Gas density [kg/m^3] of the environment, with values corresponding to _halo_radius_
 
-Temperature [K] of the environment, with values correspond to halo_radius
 
-halo_radius : array-like
+**_temperature_profile_ : array-like**
 
-Radial component [m] of gas_density_profile and temperature_profile
+  Temperature [K] of the environment, with values correspond to _halo_radius_
 
-Returns:
+
+**_halo_radius_ : array-like**
+
+  Radial component [m] of _gas_density_profile_ and _temperature_profile_
+
+________________________
+__Returns:__
+
 
 Creates array files (.txt) for:
 
-Q_eff : array-like
+**_Q_eff_ : array-like**
 
-Effective radially-averaged volumetric power [W/m^3] of the AGN
+  Effective radially-averaged volumetric power [W/m^3] of the AGN
 
-v_kick : array-like
 
-Velocity kick [m/s] imparted on the gas
+**_v_kick_ : array-like**
 
-NTP_fraction : array-like
+  Velocity kick [m/s] imparted on the gas
 
-Fraction of non-thermal pressure to total pressure [percent]
+
+**_NTP_fraction_ : array-like**
+
+  Fraction of non-thermal pressure to total pressure [percent] 
+
+______________________________________________________________________________________
