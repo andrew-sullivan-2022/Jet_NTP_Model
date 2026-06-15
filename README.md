@@ -1,7 +1,7 @@
 **Function for calculating ensemble-average jet heating:**
 -----------------------------------------
 
-**calculate_ensemble_jet_heating**(**log_Qjet_vals**,   **log_active_age_vals**,   **duty_cycle**,   **redshift**,   **gas_density_profile**,   **temperature_profile**,   **halo_radius**,   **log_dt**=_0.01_)
+**calculate_ensemble_jet_heating**(**log_Qjet_vals**,   **log_age_vals**,   **duty_cycle**,   **redshift**,   **gas_density_profile**,   **temperature_profile**,   **halo_radius**,   **log_dt**=_0.01_)
 
 ________________________
 __Parameters:__
@@ -13,10 +13,10 @@ __Parameters:__
 Logarithmic jet power [log W]
 
 
-**_log_active_age_vals_ : float or array-like**
+**_log_age_vals_ : float or array-like**
 
 
-Logarithmic active age [log yr]
+Logarithmic source age age [log yr]
 
 
 **_duty_cycle_ : float or array-like**
