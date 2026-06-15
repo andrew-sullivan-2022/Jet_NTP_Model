@@ -7,16 +7,16 @@ ________________________
 __Parameters:__
 
 
-**_log_Qjet_vals_ : float or array-like**
+**_log_Qjet_vals_ : array-like**
 
 
-Logarithmic jet power [log W]
+Logarithmic jet powers [log W] of an ensemble of radio sources
 
 
 **_log_age_vals_ : float or array-like**
 
 
-Logarithmic source age [log yr]
+Logarithmic ages [log yr] of an ensemble of radio sources
 
 
 **_duty_cycle_ : float or array-like**
