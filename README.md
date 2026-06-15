@@ -16,7 +16,7 @@ Logarithmic jet power [log W]
 **_log_age_vals_ : float or array-like**
 
 
-Logarithmic source age age [log yr]
+Logarithmic source age [log yr]
 
 
 **_duty_cycle_ : float or array-like**
